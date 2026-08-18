@@ -1,0 +1,9 @@
+{
+  "_comment": "Test Event — Missing Required Field (should return HTTP 400)",
+
+  "httpMethod": "POST",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": "{\"name\":\"Vignesh Kumar\",\"email\":\"vignesh@gmail.com\",\"phone\":\"9876543210\",\"department\":\"CSE\",\"college\":\"Karpagam Institute of Technology\",\"event\":\"Technical Workshop\",\"fileName\":\"Vignesh_ID.pdf\",\"fileType\":\"application/pdf\"}"
+}

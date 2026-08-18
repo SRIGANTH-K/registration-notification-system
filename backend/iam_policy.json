@@ -1,0 +1,48 @@
+{
+  "_comment": "Least-privilege IAM inline policy for the Lambda execution role.",
+  "_comment2": "Replace REGION, ACCOUNT_ID, BUCKET_NAME, TABLE_NAME, and SNS ARN with your real values.",
+
+  "Version": "2012-10-17",
+  "Statement": [
+
+    {
+      "Sid": "AllowS3DocumentUploadAndRollback",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::BUCKET_NAME/*"
+    },
+
+    {
+      "Sid": "AllowDynamoDBPutRegistration",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:PutItem"
+      ],
+      "Resource": "arn:aws:dynamodb:REGION:ACCOUNT_ID:table/EventRegistrations"
+    },
+
+    {
+      "Sid": "AllowSNSPublishNotification",
+      "Effect": "Allow",
+      "Action": [
+        "sns:Publish"
+      ],
+      "Resource": "arn:aws:sns:REGION:ACCOUNT_ID:EventRegistrationNotification"
+    },
+
+    {
+      "Sid": "AllowCloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:REGION:ACCOUNT_ID:log-group:/aws/lambda/EventRegistrationBackend:*"
+    }
+
+  ]
+}

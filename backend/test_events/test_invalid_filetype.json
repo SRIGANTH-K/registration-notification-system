@@ -1,0 +1,9 @@
+{
+  "_comment": "Test Event — Disallowed File Type (should return HTTP 400)",
+
+  "httpMethod": "POST",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": "{\"name\":\"Vignesh Kumar\",\"email\":\"vignesh@gmail.com\",\"phone\":\"9876543210\",\"department\":\"CSE\",\"college\":\"Karpagam Institute of Technology\",\"event\":\"Technical Workshop\",\"fileName\":\"resume.docx\",\"fileType\":\"application/vnd.openxmlformats-officedocument.wordprocessingml.document\",\"fileData\":\"AAAA\"}"
+}

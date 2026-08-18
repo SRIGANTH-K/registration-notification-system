@@ -1,0 +1,17 @@
+{
+  "_comment": "=================================================================",
+  "_comment2": "Lambda Console Test Event — Valid Registration",
+  "_comment3": "",
+  "_comment4": "HOW TO USE:",
+  "_comment5": "1. Open Lambda → Test → Create new test event",
+  "_comment6": "2. Paste this JSON (remove _comment keys first)",
+  "_comment7": "3. Replace BASE64_DATA with a real Base64 string (see README)",
+  "_comment8": "=================================================================",
+
+  "httpMethod": "POST",
+  "headers": {
+    "Content-Type": "application/json",
+    "Origin": "http://localhost:8080"
+  },
+  "body": "{\"name\":\"Vignesh Kumar\",\"email\":\"vignesh@gmail.com\",\"phone\":\"9876543210\",\"department\":\"CSE\",\"college\":\"Karpagam Institute of Technology\",\"event\":\"Technical Workshop\",\"fileName\":\"Vignesh_ID.pdf\",\"fileType\":\"application/pdf\",\"fileData\":\"BASE64_DATA\"}"
+}

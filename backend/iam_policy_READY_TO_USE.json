@@ -1,0 +1,30 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "S3DocumentUploadAndRollback",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::event-registation-2026/*"
+    },
+    {
+      "Sid": "DynamoDBSaveRegistration",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:PutItem"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:031924002941:table/EventRegistrations"
+    },
+    {
+      "Sid": "SNSPublishNotification",
+      "Effect": "Allow",
+      "Action": [
+        "sns:Publish"
+      ],
+      "Resource": "arn:aws:sns:us-east-1:031924002941:EventRegistrationNotification"
+    }
+  ]
+}

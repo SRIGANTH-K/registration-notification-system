@@ -1,0 +1,11 @@
+{
+  "_comment": "Test Event — CORS Pre-flight OPTIONS (should return HTTP 200)",
+
+  "httpMethod": "OPTIONS",
+  "headers": {
+    "Origin": "http://localhost:8080",
+    "Access-Control-Request-Method": "POST",
+    "Access-Control-Request-Headers": "Content-Type"
+  },
+  "body": null
+}
