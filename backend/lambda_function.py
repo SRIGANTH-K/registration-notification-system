@@ -1,22 +1,22 @@
 """
 =============================================================================
-  EVENT REGISTRATION PORTAL — lambda_function.py
-  AWS Lambda Backend
+EVENT REGISTRATION PORTAL — lambda_function.py
+AWS Lambda Backend
 
-  Compatible with:
-    - API Gateway HTTP API  (payload format 2.0)  ← your setup
-    - API Gateway REST API  (payload format 1.0)
+Compatible with:
+  - API Gateway HTTP API  (payload format 2.0)  ← your setup
+  - API Gateway REST API  (payload format 1.0)
 
-  Environment variables (Lambda → Configuration → Environment variables):
-    BUCKET_NAME     e.g.  event-registation-2026
-    TABLE_NAME      e.g.  EventRegistrations
-    SNS_TOPIC_ARN   e.g.  arn:aws:sns:us-east-1:031924002941:EventRegistrationNotification
+Environment variables (Lambda → Configuration → Environment variables):
+  BUCKET_NAME     e.g.  event-registation-2026
+  TABLE_NAME      e.g.  EventRegistrations
+  SNS_TOPIC_ARN   e.g.  arn:aws:sns:us-east-1:031924002941:EventRegistrationNotification
 
-  IAM permissions required on the Lambda execution role:
-    s3:PutObject, s3:DeleteObject  → arn:aws:s3:::BUCKET_NAME/*
-    dynamodb:PutItem               → arn:aws:dynamodb:REGION:ACCOUNT:table/TABLE_NAME
-    sns:Publish                    → SNS_TOPIC_ARN
-    + AWSLambdaBasicExecutionRole  (CloudWatch Logs)
+IAM permissions required on the Lambda execution role:
+  s3:PutObject, s3:DeleteObject  → arn:aws:s3:::BUCKET_NAME/*
+  dynamodb:PutItem               → arn:aws:dynamodb:REGION:ACCOUNT:table/TABLE_NAME
+  sns:Publish                    → SNS_TOPIC_ARN
+  + AWSLambdaBasicExecutionRole  (CloudWatch Logs)
 =============================================================================
 """
 
@@ -61,14 +61,17 @@ def _clean_env(key: str) -> str:
         )
     return cleaned
 
+
 BUCKET_NAME   = _clean_env("BUCKET_NAME")
 TABLE_NAME    = _clean_env("TABLE_NAME")
 SNS_TOPIC_ARN = _clean_env("SNS_TOPIC_ARN")
 AWS_REGION    = os.environ.get("AWS_REGION", "us-east-1")  # injected by Lambda runtime
 
 # Log startup values (safe — no credentials)
-logger.info("STARTUP — BUCKET_NAME=%r  TABLE_NAME=%r  REGION=%s",
-            BUCKET_NAME, TABLE_NAME, AWS_REGION)
+logger.info(
+    "STARTUP — BUCKET_NAME=%r  TABLE_NAME=%r  REGION=%s",
+    BUCKET_NAME, TABLE_NAME, AWS_REGION
+)
 
 # Detect missing vars at cold-start
 _missing_vars = [
@@ -103,6 +106,7 @@ ALLOWED_MIME_TYPES = {
     "image/jpg",
     "image/png",
 }
+
 ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
 
 REQUIRED_FIELDS = [
@@ -121,7 +125,6 @@ CORS_HEADERS = {
 # =============================================================================
 #  Lambda entry point
 # =============================================================================
-
 def lambda_handler(event, context):
     try:
         return _handle(event, context)
@@ -136,9 +139,7 @@ def lambda_handler(event, context):
 # =============================================================================
 #  Internal handler
 # =============================================================================
-
 def _handle(event, context):
-
     logger.info("=== New registration request ===")
     logger.info("Event keys: %s", list(event.keys()))
 
@@ -234,7 +235,6 @@ def _handle(event, context):
     # ------------------------------------------------------------------
     safe_name = _sanitize_filename(file_name_raw)
     s3_key    = f"{department}/{registration_id}_{safe_name}"
-
     logger.info("S3 upload — bucket=%s  key=%s", BUCKET_NAME, s3_key)
 
     try:
@@ -248,8 +248,10 @@ def _handle(event, context):
     except ClientError as exc:
         code = exc.response["Error"]["Code"]
         msg  = exc.response["Error"]["Message"]
-        logger.error("S3 FAILED — Code=%s  Bucket=%s  Key=%s  Msg=%s",
-                     code, BUCKET_NAME, s3_key, msg)
+        logger.error(
+            "S3 FAILED — Code=%s  Bucket=%s  Key=%s  Msg=%s",
+            code, BUCKET_NAME, s3_key, msg
+        )
         return _build_response(500, {
             "success": False,
             "message": f"S3 upload failed ({code}). Check s3:PutObject permission on bucket '{BUCKET_NAME}'.",
@@ -264,12 +266,11 @@ def _handle(event, context):
     #  run and TABLE_NAME is guaranteed to be a clean ASCII string.
     # ------------------------------------------------------------------
     logger.info("DynamoDB save — table=%r", TABLE_NAME)
-
     db_table   = dynamodb_res.Table(TABLE_NAME)
     created_at = datetime.now(timezone.utc).isoformat()
 
     item = {
-        "registrationId": registration_id,
+        "registration-id": registration_id,
         "name":           participant_name,
         "email":          email,
         "phone":          phone,
@@ -289,15 +290,19 @@ def _handle(event, context):
     except ClientError as exc:
         code = exc.response["Error"]["Code"]
         msg  = exc.response["Error"]["Message"]
-        logger.error("DynamoDB FAILED — Code=%s  Table=%r  Msg=%s",
-                     code, TABLE_NAME, msg)
+        logger.error(
+            "DynamoDB FAILED — Code=%s  Table=%r  Msg=%s",
+            code, TABLE_NAME, msg
+        )
         # Rollback S3 object
         try:
             s3_client.delete_object(Bucket=BUCKET_NAME, Key=s3_key)
             logger.info("S3 rollback successful")
         except ClientError as rb:
-            logger.error("S3 rollback FAILED — orphaned object: %s  Code=%s",
-                         s3_key, rb.response["Error"]["Code"])
+            logger.error(
+                "S3 rollback FAILED — orphaned object: %s  Code=%s",
+                s3_key, rb.response["Error"]["Code"]
+            )
         return _build_response(500, {
             "success": False,
             "message": (
@@ -346,13 +351,14 @@ def _handle(event, context):
     # ------------------------------------------------------------------
     #  Step 8 — Return success
     # ------------------------------------------------------------------
-    logger.info("=== COMPLETE — ID=%s  %s  %s ===",
-                registration_id, participant_name, event_name)
-
+    logger.info(
+        "=== COMPLETE — ID=%s  %s  %s ===",
+        registration_id, participant_name, event_name
+    )
     return _build_response(200, {
         "success":        True,
         "message":        "Registration successful",
-        "registrationId": registration_id,
+        "registration-id": registration_id,
         "documentUrl":    document_url,
     })
 
@@ -362,10 +368,9 @@ def _handle(event, context):
 # =============================================================================
 
 def _get_http_method(event: dict) -> str:
-    """
-    Extract HTTP method — works for both API Gateway versions:
-      REST API  (v1 / format 1.0): event["httpMethod"]
-      HTTP API  (v2 / format 2.0): event["requestContext"]["http"]["method"]
+    """Extract HTTP method — works for both API Gateway versions:
+    REST API  (v1 / format 1.0): event["httpMethod"]
+    HTTP API  (v2 / format 2.0): event["requestContext"]["http"]["method"]
     """
     # v1 REST API
     if "httpMethod" in event:
@@ -378,8 +383,7 @@ def _get_http_method(event: dict) -> str:
 
 
 def _parse_body(event: dict) -> dict:
-    """
-    Parse the request body from an API Gateway event.
+    """Parse the request body from an API Gateway event.
 
     Handles:
       A) API Gateway v1/v2 normal:  event["body"] is a JSON string
@@ -412,7 +416,6 @@ def _parse_body(event: dict) -> dict:
 
 def _validate(body: dict):
     """Returns None if valid, or an error string."""
-
     for field in REQUIRED_FIELDS:
         if not str(body.get(field, "")).strip():
             return f"'{field}' is required and cannot be empty."
@@ -442,8 +445,7 @@ def _validate(body: dict):
 
 
 def _sanitize_filename(filename: str) -> str:
-    """
-    Return a safe S3-key-safe filename:
+    """Return a safe S3-key-safe filename:
     - basename only (blocks path traversal)
     - ASCII normalised
     - unsafe chars → underscore

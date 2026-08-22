@@ -510,13 +510,15 @@ form.addEventListener("submit", async (e) => {
     }
 
     // ---- Success path ----
+    // Lambda returns "registration-id" (hyphenated) not "registrationId"
+    const regId = data && (data["registration-id"] || data.registrationId);
     if ((response.status === 200 || response.status === 201) &&
-        data && data.success === true && data.registrationId) {
+        data && data.success === true && regId) {
       setProgressStep("completed");
       // Brief pause so the user sees the "Completed" step
       setTimeout(() => {
         setLoading(false);
-        showSuccessCard(data.registrationId, data.documentUrl || null);
+        showSuccessCard(regId, data.documentUrl || null);
       }, 700);
       return;
     }

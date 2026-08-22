@@ -1,30 +1,79 @@
-# Event Registration Backend — Deployment & Testing Guide
+# AWS Event Registration Portal
 
-## Project Structure
+A fully serverless event registration system built on AWS. Participants fill out a form, upload a document, and receive a registration ID — all processed in real time through API Gateway, Lambda, S3, DynamoDB, and SNS.
+
+![Architecture](https://img.shields.io/badge/AWS-Serverless-orange?logo=amazonaws) ![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python) ![Frontend](https://img.shields.io/badge/Frontend-HTML%2FCSS%2FJS-yellow)
+
+---
+
+## Live Architecture
 
 ```
-backend/
-├── lambda_function.py          ← Lambda source code (deploy this)
-├── iam_policy.json             ← Least-privilege IAM policy template
-└── test_events/
-    ├── test_valid_registration.json
-    ├── test_missing_field.json
-    ├── test_invalid_email.json
-    ├── test_invalid_filetype.json
-    └── test_cors_preflight.json
+Participant (Browser)
+       │
+       │  POST /register  (JSON + Base64 file)
+       ▼
+ API Gateway  ──── REST API, Regional, Proxy Integration
+       │
+       ▼
+ Lambda: EventRegistrationBackend  (Python 3.12)
+       │
+       ├──▶  S3 Bucket
+       │       └── {department}/REG-2026-XXXXXX_filename.pdf
+       │
+       ├──▶  DynamoDB Table: EventRegistrations
+       │       └── { registration-id, name, email, phone, ... }
+       │
+       └──▶  SNS Topic → Email notification to organiser
 ```
 
 ---
 
-## Step 1 — AWS Resource Setup
+## Project Structure
 
-### 1a. S3 Bucket
+```
+AWS_Event_Registration_Form/
+├── frontend/
+│   ├── index.html              ← Registration portal UI
+│   ├── script.js               ← Form logic, validation, API call
+│   └── style.css               ← Responsive styles
+│
+└── backend/
+    ├── lambda_function.py      ← Lambda source (deploy this)
+    ├── iam_policy.json         ← IAM policy template
+    ├── iam_policy_READY_TO_USE.json
+    ├── s3_bucket_policy_CORRECTED.json
+    └── test_events/
+        ├── test_valid_registration.json
+        ├── test_missing_field.json
+        ├── test_invalid_email.json
+        ├── test_invalid_filetype.json
+        └── test_cors_preflight.json
+```
 
-1. Go to **S3 → Create bucket**
-2. Name: `event-registration-sujith-2026` (must be globally unique — change it)
-3. Region: `ap-south-1` (Mumbai) or your preferred region
-4. **Uncheck** "Block all public access" for the demo
-5. After creation, go to **Permissions → Bucket policy** and paste:
+---
+
+## Features
+
+- **Client-side validation** — name, email, Indian mobile number (6–9 prefix), department, college, event, and file type/size checks before the API call
+- **Drag-and-drop file upload** with preview — PDF, JPG, JPEG, PNG up to 5 MB
+- **Registration ID** generated server-side (`REG-2026-XXXXXX`) — cannot be forged
+- **S3 rollback** — if DynamoDB write fails after the S3 upload, the orphaned file is automatically deleted
+- **SNS notification** is non-fatal — a failed email alert does not cancel a successful registration
+- **CORS pre-flight** handled inside Lambda — works with both API Gateway REST (v1) and HTTP API (v2) payload formats
+- **Invisible-character sanitisation** on all environment variables — prevents `ValidationException` from copy-pasted values in the Lambda console
+
+---
+
+## AWS Setup
+
+### 1 — S3 Bucket
+
+1. **S3 → Create bucket**
+2. Name: `event-registration-2026` (must be globally unique — choose your own)
+3. Region: choose your preferred region
+4. Uncheck **Block all public access** (needed for the document view link)
+5. After creation → **Permissions → Bucket policy** → paste:
 
 ```json
 {
@@ -34,193 +83,177 @@ backend/
     "Effect": "Allow",
     "Principal": "*",
     "Action": "s3:GetObject",
-    "Resource": "arn:aws:s3:::event-registration-sujith-2026/*"
+    "Resource": "arn:aws:s3:::event-registration-2026/*"
   }]
 }
 ```
 
-> **Note:** The Lambda only needs `s3:PutObject` and `s3:DeleteObject`.
-> Public read is controlled by the **bucket policy**, not Lambda permissions.
+> The Lambda only needs `s3:PutObject` and `s3:DeleteObject`. Public read is granted by the bucket policy above.
 
 ---
 
-### 1b. DynamoDB Table
+### 2 — DynamoDB Table
 
-1. Go to **DynamoDB → Create table**
+1. **DynamoDB → Create table**
 2. Table name: `EventRegistrations`
-3. Partition key: `registrationId` (String)
-4. Sort key: (leave empty)
-5. Billing mode: **On-demand** (pay per request — best for events)
+3. Partition key: `registration-id` (String)
+4. Sort key: *(leave empty)*
+5. Billing mode: **On-demand**
 6. Click **Create table**
 
 ---
 
-### 1c. SNS Topic
+### 3 — SNS Topic
 
-1. Go to **SNS → Topics → Create topic**
+1. **SNS → Topics → Create topic**
 2. Type: **Standard**
 3. Name: `EventRegistrationNotification`
-4. Click **Create topic**
-5. Copy the **Topic ARN** — you'll need it as an environment variable
+4. Click **Create topic** → copy the **Topic ARN**
 
 **Subscribe the organiser's email:**
 1. Inside the topic → **Create subscription**
-2. Protocol: **Email**
-3. Endpoint: organiser's email address
-4. Click **Create subscription**
-5. Check the inbox and click the confirmation link
+2. Protocol: **Email** → enter the organiser's address
+3. Check inbox and click the **confirmation link**
 
 ---
 
-### 1d. Lambda Function
+### 4 — Lambda Function
 
-1. Go to **Lambda → Create function**
-2. Choose: **Author from scratch**
-3. Function name: `EventRegistrationBackend`
-4. Runtime: **Python 3.12** (or the latest Python version available)
-5. Architecture: `x86_64`
-6. Click **Create function**
+1. **Lambda → Create function → Author from scratch**
+2. Function name: `EventRegistrationBackend`
+3. Runtime: **Python 3.12**
+4. Architecture: `x86_64`
+5. Click **Create function**
 
-**Upload the code:**
-- In the Lambda code editor, replace the default code with the contents of `lambda_function.py`
+**Deploy the code:**
+- Paste the contents of `backend/lambda_function.py` into the inline editor
 - Click **Deploy**
 
-**Set environment variables:**
-Go to **Configuration → Environment variables → Edit** and add:
+**Environment variables** (Configuration → Environment variables → Edit):
 
-| Key             | Value (your real values)                                    |
-|-----------------|-------------------------------------------------------------|
-| `BUCKET_NAME`   | `event-registration-sujith-2026`                            |
-| `TABLE_NAME`    | `EventRegistrations`                                        |
-| `SNS_TOPIC_ARN` | `arn:aws:sns:ap-south-1:123456789012:EventRegistrationNotification` |
+| Key             | Example value                                                    |
+|-----------------|------------------------------------------------------------------|
+| `BUCKET_NAME`   | `event-registration-2026`                                        |
+| `TABLE_NAME`    | `EventRegistrations`                                             |
+| `SNS_TOPIC_ARN` | `arn:aws:sns:us-east-1:123456789012:EventRegistrationNotification` |
 
-**Increase timeout:**
-Go to **Configuration → General configuration → Edit**
-- Timeout: `30 seconds` (file uploads can take a moment)
-- Memory: `256 MB`
+> Paste values carefully — invisible characters (zero-width spaces, BOM) pasted from some editors will cause a DynamoDB `ValidationException`. The Lambda will log a warning and auto-clean them if found.
 
----
-
-### 1e. IAM — Lambda Execution Role
-
-1. Go to **IAM → Roles → Find the role** that was auto-created for your Lambda
-   (it will be named something like `EventRegistrationBackend-role-xxxx`)
-2. Click **Add permissions → Create inline policy**
-3. Switch to the **JSON** tab
-4. Paste the contents of `iam_policy.json` — replacing:
-   - `REGION` with your region (e.g., `ap-south-1`)
-   - `ACCOUNT_ID` with your 12-digit AWS account ID
-   - `BUCKET_NAME` with your real bucket name
-5. Name the policy: `EventRegistrationPolicy`
-6. Click **Create policy**
-
-> Also attach the **AWSLambdaBasicExecutionRole** managed policy
-> for CloudWatch Logs if it isn't already attached.
+**General configuration:**
+- Timeout: **30 seconds**
+- Memory: **256 MB**
 
 ---
 
-## Step 2 — API Gateway Setup
+### 5 — IAM Role
 
-1. Go to **API Gateway → Create API → REST API → Build**
-2. API name: `EventRegistrationAPI`
-3. Endpoint type: **Regional**
-
-**Create resource and method:**
-1. Create resource: `/register`
-2. On `/register`, create method: **POST**
-3. Integration type: **Lambda Function**
-4. Check **Use Lambda Proxy integration** ✓
-5. Lambda function: `EventRegistrationBackend`
-6. Click **Save**
-
-**Enable CORS:**
-1. Select the `/register` resource
-2. Click **Actions → Enable CORS**
-3. Access-Control-Allow-Origin: `'*'`  (or your S3 website URL)
-4. Click **Enable CORS and replace existing CORS headers**
-
-**Deploy:**
-1. Click **Actions → Deploy API**
-2. Deployment stage: **[New stage]** → name it `prod`
-3. Click **Deploy**
-4. Copy the **Invoke URL** — e.g.:
-   `https://abc123xyz.execute-api.ap-south-1.amazonaws.com/prod`
-
-**Your API endpoint:**
-```
-https://abc123xyz.execute-api.ap-south-1.amazonaws.com/prod/register
-```
+1. **IAM → Roles** → open the auto-created role for your Lambda  
+   (named `EventRegistrationBackend-role-xxxx`)
+2. **Add permissions → Create inline policy → JSON tab**
+3. Paste `backend/iam_policy.json`, replacing:
+   - `REGION` → your AWS region (e.g. `us-east-1`)
+   - `ACCOUNT_ID` → your 12-digit AWS account ID
+   - `BUCKET_NAME` → your bucket name
+4. Name the policy `EventRegistrationPolicy` → **Create policy**
+5. Also confirm **AWSLambdaBasicExecutionRole** is attached (for CloudWatch Logs)
 
 ---
 
-## Step 3 — Configure the Frontend
+### 6 — API Gateway
 
-Open `frontend/script.js` and replace:
+1. **API Gateway → Create API → REST API → Build**
+2. API name: `EventRegistrationAPI` | Endpoint type: **Regional**
+3. Create resource: `/register`
+4. On `/register` → create method: **POST**
+   - Integration type: **Lambda Function**
+   - ✅ Use Lambda Proxy integration
+   - Lambda function: `EventRegistrationBackend`
+5. **Actions → Enable CORS** → Access-Control-Allow-Origin: `*`
+6. **Actions → Deploy API** → new stage: `prod`
+7. Copy the **Invoke URL**:
+   ```
+   https://<id>.execute-api.<region>.amazonaws.com/prod/register
+   ```
+
+---
+
+## Frontend Configuration
+
+Open `frontend/script.js` and set your API URL on line 18:
 
 ```js
-const API_URL = "YOUR_API_GATEWAY_URL";
+const API_URL = "https://<id>.execute-api.<region>.amazonaws.com/prod/register";
 ```
 
-with:
-
-```js
-const API_URL = "https://abc123xyz.execute-api.ap-south-1.amazonaws.com/prod/register";
-```
+That's the only change needed before going live.
 
 ---
 
-## Step 4 — Testing
+## Running Locally
 
-### 4a. Generate a Real Base64 Test String
+```bash
+cd frontend
+python -m http.server 8080
+```
+
+Open `http://localhost:8080` in your browser.
+
+> No build tools, no npm, no dependencies — just static HTML/CSS/JS.
+
+---
+
+## Testing
+
+### Generate a Base64 test string
 
 **Windows PowerShell:**
 ```powershell
-$bytes = [System.IO.File]::ReadAllBytes("C:\path\to\test.pdf")
-$b64   = [Convert]::ToBase64String($bytes)
-$b64 | Set-Clipboard   # copies to clipboard
+$b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\to\test.pdf"))
+$b64 | Set-Clipboard
 ```
 
-**Linux / macOS / Git Bash:**
+**macOS / Linux:**
 ```bash
 base64 -w 0 test.pdf | pbcopy   # macOS
-base64 -w 0 test.pdf | xclip    # Linux
+base64 -w 0 test.pdf            # Linux — copy the output
 ```
 
-Paste the Base64 string into the `"fileData"` field of the test event JSON,
-replacing `"BASE64_DATA"`.
+Paste the result into the `"fileData"` field of a test event JSON.
 
 ---
 
-### 4b. Test Lambda Directly (Lambda Console)
+### Lambda console test
 
-1. Open your Lambda function
-2. Click **Test → Create new test event**
-3. Paste the contents of `test_events/test_valid_registration.json`
-4. Replace `BASE64_DATA` with your real Base64 string
-5. Click **Test**
-6. Expected result:
+1. Lambda → **Test → Create new test event**
+2. Paste `test_events/test_valid_registration.json`
+3. Replace `BASE64_DATA` with your real Base64 string
+4. Click **Test**
+
+Expected response:
 ```json
 {
   "statusCode": 200,
-  "body": "{\"success\": true, \"registrationId\": \"REG-2026-XXXXXX\", ...}"
+  "body": "{\"success\": true, \"registration-id\": \"REG-2026-XXXXXX\", \"documentUrl\": \"https://...\"}"
 }
 ```
 
-Run the other test events to verify error handling:
-- `test_missing_field.json` → should return `400`
-- `test_invalid_email.json` → should return `400`
-- `test_invalid_filetype.json` → should return `400`
-- `test_cors_preflight.json` → should return `200`
+Run the error-case events to verify validation:
+
+| Test file                    | Expected status |
+|------------------------------|-----------------|
+| `test_missing_field.json`    | `400`           |
+| `test_invalid_email.json`    | `400`           |
+| `test_invalid_filetype.json` | `400`           |
+| `test_cors_preflight.json`   | `200`           |
 
 ---
 
-### 4c. Test API Gateway (curl / Postman)
+### API Gateway test (PowerShell)
 
-**curl (PowerShell — Windows):**
 ```powershell
 $body = @{
   name       = "Vignesh Kumar"
-  email      = "vignesh@gmail.com"
+  email      = "vignesh@college.edu"
   phone      = "9876543210"
   department = "CSE"
   college    = "Karpagam Institute of Technology"
@@ -230,110 +263,61 @@ $body = @{
   fileData   = (Get-Content "base64.txt" -Raw)
 } | ConvertTo-Json
 
-Invoke-RestMethod `
-  -Method POST `
-  -Uri "https://YOUR_API_ID.execute-api.ap-south-1.amazonaws.com/prod/register" `
+Invoke-RestMethod -Method POST `
+  -Uri "https://<id>.execute-api.<region>.amazonaws.com/prod/register" `
   -ContentType "application/json" `
   -Body $body
 ```
 
-**Postman:**
-- Method: `POST`
-- URL: your API Gateway invoke URL + `/register`
-- Body: `raw` → `JSON`
-- Paste the JSON payload with a real Base64 fileData value
+---
+
+### Verify end-to-end
+
+After a successful form submission:
+
+- ✅ **S3** — file appears at `{department}/REG-2026-XXXXXX_filename.pdf`
+- ✅ **DynamoDB** — record with all fields visible under **Explore table items**
+- ✅ **SNS** — organiser receives the "New Event Registration" email
+- ✅ **CloudWatch** — `/aws/lambda/EventRegistrationBackend` shows the full log trail
+- ✅ **Frontend** — success card displays the `REG-2026-XXXXXX` ID and document link
 
 ---
 
-### 4d. Verify S3 Upload
+## Environment Variables Reference
 
-1. Go to **S3 → your bucket**
-2. Look for a folder named after the department (e.g., `CSE/`)
-3. Inside, find the uploaded file: `CSE/REG-2026-XXXXXX_test.pdf`
-4. Click the file → **Object URL** → should be publicly viewable
-
----
-
-### 4e. Verify DynamoDB Record
-
-1. Go to **DynamoDB → Tables → EventRegistrations**
-2. Click **Explore table items**
-3. Find the item with your `registrationId`
-4. Verify all fields: name, email, s3Key, documentUrl, createdAt, etc.
+| Variable        | Description                        | Example                                                          |
+|-----------------|------------------------------------|------------------------------------------------------------------|
+| `BUCKET_NAME`   | S3 bucket for uploaded documents   | `event-registration-2026`                                        |
+| `TABLE_NAME`    | DynamoDB table name                | `EventRegistrations`                                             |
+| `SNS_TOPIC_ARN` | Full ARN of the SNS topic          | `arn:aws:sns:us-east-1:123456789012:EventRegistrationNotification` |
 
 ---
 
-### 4f. Verify SNS Email Notification
+## Tech Stack
 
-1. Check the organiser's email inbox
-2. Confirm you received the "New Event Registration" email
-3. If not received:
-   - Check the SNS topic → Subscriptions → confirm status is `Confirmed`
-   - Check CloudWatch logs for SNS errors
-
----
-
-### 4g. Verify CloudWatch Logs
-
-1. Go to **CloudWatch → Log groups**
-2. Find: `/aws/lambda/EventRegistrationBackend`
-3. Click the latest log stream
-4. You should see entries like:
-   ```
-   [INFO] Registration request received
-   [INFO] Generated registration ID: REG-2026-A7F29B
-   [INFO] Uploading document to S3: s3://event-registration-sujith-2026/CSE/...
-   [INFO] Document uploaded to S3 successfully
-   [INFO] Saving registration to DynamoDB — table: EventRegistrations
-   [INFO] Registration saved to DynamoDB successfully
-   [INFO] Publishing SNS notification
-   [INFO] SNS notification sent successfully
-   [INFO] Registration completed — ID: REG-2026-A7F29B
-   ```
+| Layer       | Service / Technology                        |
+|-------------|---------------------------------------------|
+| Frontend    | HTML5, CSS3, Vanilla JavaScript             |
+| API         | AWS API Gateway (REST, Regional)            |
+| Backend     | AWS Lambda (Python 3.12)                    |
+| Storage     | AWS S3                                      |
+| Database    | AWS DynamoDB (On-demand)                    |
+| Notification| AWS SNS (Email subscription)                |
+| Monitoring  | AWS CloudWatch Logs                         |
+| Auth / IAM  | AWS IAM (least-privilege inline policy)     |
 
 ---
 
-### 4h. Full Frontend-to-Backend Flow Test
+## Security Notes
 
-1. Run the frontend locally:
-   ```bash
-   cd frontend
-   python -m http.server 8080
-   ```
-2. Open `http://localhost:8080` in a browser
-3. Fill in the registration form completely
-4. Upload a valid PDF or image (under 5 MB)
-5. Click **Submit Registration**
-6. Verify:
-   - ✅ Success card appears with a `REG-2026-XXXXXX` ID
-   - ✅ "View Uploaded Document" link opens the file from S3
-   - ✅ DynamoDB has the new record
-   - ✅ Organiser received the SNS email
-   - ✅ CloudWatch has the full log trail
+- No AWS credentials are stored in the frontend — only the public API Gateway URL
+- Registration IDs are generated server-side only — clients cannot supply their own
+- File names are sanitised (path traversal blocked, ASCII-normalised, max 100 chars)
+- All environment variables are cleaned of invisible Unicode on cold-start
+- IAM policy follows least privilege — Lambda can only `PutObject` and `DeleteObject` on its own bucket
 
 ---
 
-## Architecture Summary
+## License
 
-```
-Participant (Browser)
-        │
-        │  POST /register  (JSON + Base64 file)
-        ▼
-  API Gateway  (REST, regional, proxy integration)
-        │
-        ▼
-  Lambda: EventRegistrationBackend  (Python 3.12)
-        │
-        ├──▶  S3: event-registration-sujith-2026
-        │         └── CSE/REG-2026-A7F29B_filename.pdf
-        │
-        ├──▶  DynamoDB: EventRegistrations
-        │         └── { registrationId, name, email, ... }
-        │
-        └──▶  SNS: EventRegistrationNotification
-                  └── Email → Organiser inbox
-
-  IAM Role  ──▶  Lambda (s3:PutObject, dynamodb:PutItem, sns:Publish, logs:*)
-  CloudWatch ──▶  /aws/lambda/EventRegistrationBackend
-```
+MIT — free to use, modify, and deploy.
