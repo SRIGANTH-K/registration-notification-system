@@ -25,23 +25,22 @@ Everything runs on AWS — no servers to manage, no idle costs, and it scales au
 ## Features
 
 **Frontend**
-- Responsive, mobile-friendly UI built with plain HTML, CSS, and JavaScript — no frameworks, no build step
-- Real-time client-side validation: name, email, Indian mobile number (6–9 prefix), department, college, event selection, file type, and file size
-- Drag-and-drop file upload with live preview and remove button
-- Three-step progress indicator (Preparing → Submitting → Completed) during submission
-- Success card with registration ID and document link; error card with the exact backend message for easy debugging
+- Responsive UI — plain HTML/CSS/JS, no frameworks, no build step
+- Client-side validation for all fields before any network call
+- Drag-and-drop file upload with live preview (PDF, JPG, PNG — max 5 MB)
+- Three-step progress indicator during submission
+- Success card with registration ID + document link; error card with the backend message
 
 **Backend (Lambda)**
-- Server-side validation mirrors the frontend — forged or tampered requests are rejected
-- Registration IDs (`REG-2026-XXXXXX`) are generated server-side only — clients cannot supply their own
-- Supports both API Gateway REST API (payload v1) and HTTP API (payload v2) out of the box
-- Automatic S3 rollback — if DynamoDB write fails after a successful upload, the orphaned file is deleted
-- SNS notification is non-fatal — an email failure never cancels a completed registration
-- All Lambda environment variables are stripped of invisible Unicode characters (zero-width spaces, BOM, non-breaking spaces) at cold-start to prevent silent `ValidationException` errors
-- File names are sanitised: path traversal blocked, Unicode normalised to ASCII, unsafe characters replaced, capped at 100 characters
+- Server-side validation — forged or tampered requests are rejected independently of the frontend
+- Registration IDs (`REG-2026-XXXXXX`) generated server-side only
+- Compatible with API Gateway REST API (v1) and HTTP API (v2) payload formats
+- Auto S3 rollback if DynamoDB write fails — no orphaned files
+- SNS failure is non-fatal — a missed email never cancels a completed registration
+- Env vars sanitised at cold-start — strips invisible Unicode that causes silent `ValidationException`
 
 **Infrastructure**
-- Least-privilege IAM policy — Lambda can only `PutObject` and `DeleteObject` on its own bucket, `PutItem` on its own table, and `Publish` on its own topic
+- Least-privilege IAM — Lambda scoped to only its own bucket, table, and SNS topic
 - No AWS credentials in the frontend — only the public API Gateway URL is exposed
 
 ---
@@ -95,16 +94,25 @@ AWS_Event_Registration_Form/
 
 ## Tech Stack
 
-| Layer        | Service / Technology                    |
-|--------------|-----------------------------------------|
-| Frontend     | HTML5, CSS3, Vanilla JavaScript         |
-| API          | AWS API Gateway (REST, Regional)        |
-| Backend      | AWS Lambda (Python 3.12)               |
-| Storage      | AWS S3                                  |
-| Database     | AWS DynamoDB (On-demand)               |
-| Notification | AWS SNS (Email subscription)            |
-| Monitoring   | AWS CloudWatch Logs                     |
-| Auth / IAM   | AWS IAM (least-privilege inline policy) |
+**Frontend**
+
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+
+**Backend & Cloud**
+
+![AWS Lambda](https://img.shields.io/badge/AWS_Lambda-FF9900?style=for-the-badge&logo=awslambda&logoColor=white)
+![API Gateway](https://img.shields.io/badge/API_Gateway-FF4F8B?style=for-the-badge&logo=amazonapigateway&logoColor=white)
+![Amazon S3](https://img.shields.io/badge/Amazon_S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white)
+![DynamoDB](https://img.shields.io/badge/DynamoDB-4053D6?style=for-the-badge&logo=amazondynamodb&logoColor=white)
+![Amazon SNS](https://img.shields.io/badge/Amazon_SNS-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
+![CloudWatch](https://img.shields.io/badge/CloudWatch-FF4F8B?style=for-the-badge&logo=amazoncloudwatch&logoColor=white)
+![IAM](https://img.shields.io/badge/AWS_IAM-DD344C?style=for-the-badge&logo=amazonaws&logoColor=white)
+
+**Language**
+
+![Python](https://img.shields.io/badge/Python_3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
 
 ---
 
