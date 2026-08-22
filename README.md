@@ -28,15 +28,15 @@ Everything runs on AWS — no servers to manage, no idle costs, and it scales au
 
 ---
 
-## Screenshots
+## UI Preview
 
-**Home Page**
+**Landing Page**
 
-![Home Page](./images/home.png)
+![Landing Page](./images/home.png)
 
-**Registration Successful**
+**Registration Confirmed**
 
-![Registration Success](./images/registration-success.png)
+![Registration Confirmed](./images/registration-success.png)
 
 ---
 
