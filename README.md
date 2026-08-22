@@ -22,6 +22,12 @@ Everything runs on AWS — no servers to manage, no idle costs, and it scales au
 
 ---
 
+## Live Architecture
+
+![Live Architecture](./images/Architecture.png)
+
+---
+
 ## Features
 
 **Frontend**
@@ -42,29 +48,6 @@ Everything runs on AWS — no servers to manage, no idle costs, and it scales au
 **Infrastructure**
 - Least-privilege IAM — Lambda scoped to only its own bucket, table, and SNS topic
 - No AWS credentials in the frontend — only the public API Gateway URL is exposed
-
----
-
-## Live Architecture
-
-```
-Participant (Browser)
-       │
-       │  POST /register  (JSON + Base64 file)
-       ▼
- API Gateway  ──── REST API, Regional, Proxy Integration
-       │
-       ▼
- Lambda: EventRegistrationBackend  (Python 3.12)
-       │
-       ├──▶  S3 Bucket
-       │       └── {department}/REG-2026-XXXXXX_filename.pdf
-       │
-       ├──▶  DynamoDB Table: EventRegistrations
-       │       └── { registration-id, name, email, phone, ... }
-       │
-       └──▶  SNS Topic → Email notification to organiser
-```
 
 ---
 
